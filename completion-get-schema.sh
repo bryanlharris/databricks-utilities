@@ -4,7 +4,13 @@ _get_schema_completions()
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    opts="--type --file"
+    opts="--type --file --output"
+
+    if [[ ${prev} == "--output" ]]; then
+        outputs="stdout"
+        COMPREPLY=( $(compgen -W "${outputs}" -- ${cur}) )
+        return 0
+    fi
 
     if [[ ${prev} == "--type" ]]; then
         types="json csv parquet"
