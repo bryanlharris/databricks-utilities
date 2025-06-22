@@ -11,8 +11,13 @@ parser.add_argument("--file", required=True)
 parser.add_argument("--output", required=False)
 args = parser.parse_args()
 
-spark = SparkSession.builder.getOrCreate()
+spark = SparkSession.builder.master("local[*]") \
+         .appName("edsm_bronze_load") \
+         .config("spark.ui.host", "0.0.0.0") \
+         .config("spark.driver.memory", "12g") \
+         .config("spark.executor.memory", "12g").getOrCreate()
 df = spark.read.format(args.type).load(args.file)
+df = df.drop("_corrupt_record")
 schema_json_str = df.schema.json()
 schema_json = json.loads(schema_json_str)
 
