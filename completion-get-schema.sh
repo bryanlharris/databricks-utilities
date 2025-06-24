@@ -4,7 +4,7 @@ _get_schema_completions()
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    opts="--type --file --output"
+    opts="--type --file --output --delimiter --multiline"
 
     if [[ ${prev} == "--output" ]]; then
         outputs="stdout"
@@ -15,6 +15,12 @@ _get_schema_completions()
     if [[ ${prev} == "--type" ]]; then
         types="json csv parquet"
         COMPREPLY=( $(compgen -W "${types}" -- ${cur}) )
+        return 0
+    fi
+
+    if [[ ${prev} == "--delimiter" ]]; then
+        outputs="'|' ',' ':' '/'"
+        COMPREPLY=( $(compgen -W "${outputs}" -- ${cur}) )
         return 0
     fi
 

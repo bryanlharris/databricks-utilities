@@ -18,6 +18,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--type", required=True)
 parser.add_argument("--file", required=True)
 parser.add_argument("--output", required=False)
+parser.add_argument("--delimiter", required=False)
+parser.add_argument("--multiline", action="store_true")
 args = parser.parse_args()
 
 spark = SparkSession.builder.master("local[*]") \
@@ -29,6 +31,11 @@ spark = SparkSession.builder.master("local[*]") \
 reader = spark.read.format(args.type)
 if args.type == "csv":
     reader = reader.option("header", "true").option("inferSchema", "true")
+    if args.delimiter:
+        reader = reader.option("delimiter", args.delimiter)
+if args.type == "json":
+    if args.multiline:
+        reader = reader.option("multiline", "true")
 df = reader.load(args.file)
 
 df = df.drop("_corrupt_record")
