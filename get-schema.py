@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
 
+import sys
+import platform
 import argparse
 import json
 import subprocess
 from pyspark.sql import SparkSession
+
+if sys.platform == "darwin":
+    system = "mac"
+elif "microsoft" in platform.uname().release.lower():
+    system = "wsl"
+
+print(system)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--type", required=True)
@@ -24,4 +33,7 @@ schema_json = json.loads(schema_json_str)
 if args.output == "stdout":
     print(json.dumps(schema_json, indent=4))
 else:
-    subprocess.run("clip.exe", input=json.dumps(schema_json, indent=4).encode("utf-8"))
+    if system == "mac":
+        subprocess.run("pbcopy", input=json.dumps(schema_json, indent=4).encode("utf-8"))
+    elif system == "wsl":
+        subprocess.run("clip.exe", input=json.dumps(schema_json, indent=4).encode("utf-8"))
