@@ -25,7 +25,12 @@ spark = SparkSession.builder.master("local[*]") \
          .config("spark.ui.host", "0.0.0.0") \
          .config("spark.driver.memory", "12g") \
          .config("spark.executor.memory", "12g").getOrCreate()
-df = spark.read.format(args.type).load(args.file)
+
+reader = spark.read.format(args.type)
+if args.type == "csv":
+    reader = reader.option("header", "true").option("inferSchema", "true")
+df = reader.load(args.file)
+
 df = df.drop("_corrupt_record")
 schema_json_str = df.schema.json()
 schema_json = json.loads(schema_json_str)

@@ -1,0 +1,11 @@
+id,name,age,salary,active
+1,Name_1,56,44874.02,False
+2,Name_2,69,31407.28,True
+3,Name_3,46,68106.13,True
+4,Name_4,32,65539.34,False
+5,Name_5,60,56413.94,False
+6,Name_6,25,31267.18,True
+7,Name_7,38,47895.82,False
+8,Name_8,56,94020.78,True
+9,Name_9,36,101115.8,False
+10,Name_10,40,84536.4,True
