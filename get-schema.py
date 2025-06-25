@@ -12,7 +12,7 @@ if sys.platform == "darwin":
 elif "microsoft" in platform.uname().release.lower():
     system = "wsl"
 
-print(system)
+print(system, file=sys.stderr)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--type", required=True)
