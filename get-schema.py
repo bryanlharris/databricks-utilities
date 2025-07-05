@@ -106,10 +106,30 @@ df = df.drop("_corrupt_record")
 schema_json_str = df.schema.json()
 schema_json = json.loads(schema_json_str)
 
+result = {}
+result["file_type"] = args.type
+if args.type == "csv":
+    result["read_options"] = {
+        "delimiter": detected.get("delimiter", ","),
+        "header": bool(detected.get("header", True)),
+    }
+    if detected.get("encoding"):
+        result["read_options"]["encoding"] = detected["encoding"]
+elif args.type == "json":
+    result["read_options"] = {
+        "multiline": bool(args.multiline or detected.get("multiline", False)),
+    }
+    if detected.get("encoding"):
+        result["read_options"]["encoding"] = detected["encoding"]
+else:
+    result["read_options"] = {}
+
+result["file_schema"] = schema_json
+
 if args.output == "stdout":
-    print(json.dumps(schema_json, indent=4))
+    print(json.dumps(result, indent=4))
 else:
     if system == "mac":
-        subprocess.run("pbcopy", input=json.dumps(schema_json, indent=4).encode("utf-8"))
+        subprocess.run("pbcopy", input=json.dumps(result, indent=4).encode("utf-8"))
     elif system == "wsl":
-        subprocess.run("clip.exe", input=json.dumps(schema_json, indent=4).encode("utf-8"))
+        subprocess.run("clip.exe", input=json.dumps(result, indent=4).encode("utf-8"))
