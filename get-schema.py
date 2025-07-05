@@ -5,7 +5,61 @@ import platform
 import argparse
 import json
 import subprocess
+import csv
+from pathlib import Path
+import xml.etree.ElementTree as ET
 from pyspark.sql import SparkSession
+
+
+def detect_encoding(path: str) -> str:
+    """Attempt to detect the file encoding."""
+    encodings = ["utf-8", "utf-16", "latin-1"]
+    with open(path, "rb") as fh:
+        sample = fh.read(4096)
+    for enc in encodings:
+        try:
+            sample.decode(enc)
+            return enc
+        except Exception:
+            continue
+    return "utf-8"
+
+
+def detect_csv(path: str) -> dict:
+    """Return csv related options using a small sample."""
+    encoding = detect_encoding(path)
+    with open(path, "r", encoding=encoding, errors="ignore") as fh:
+        sample = fh.read(2048)
+    sniffer = csv.Sniffer()
+    try:
+        dialect = sniffer.sniff(sample)
+        delimiter = dialect.delimiter
+    except csv.Error:
+        delimiter = ","
+    has_header = sniffer.has_header(sample)
+    return {"type": "csv", "delimiter": delimiter, "header": has_header, "encoding": encoding}
+
+
+def detect_json(path: str) -> dict:
+    """Return json related options using a small sample."""
+    encoding = detect_encoding(path)
+    with open(path, "r", encoding=encoding, errors="ignore") as fh:
+        text = fh.read(2048)
+    try:
+        json.loads(text)
+        multiline = False
+    except json.JSONDecodeError:
+        multiline = True
+    return {"type": "json", "multiline": multiline, "encoding": encoding}
+
+
+def detect_file(path: str) -> dict:
+    suffix = Path(path).suffix.lower()
+    if suffix == ".csv":
+        return detect_csv(path)
+    if suffix == ".json":
+        return detect_json(path)
+    return {"type": suffix.lstrip(".")}
 
 if sys.platform == "darwin":
     system = "mac"
@@ -15,12 +69,17 @@ elif "microsoft" in platform.uname().release.lower():
 print(system, file=sys.stderr)
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--type", required=True)
-parser.add_argument("--file", required=True)
+parser.add_argument("--type", required=False, help="File type (csv,json,parquet)")
+parser.add_argument("--file", required=True, help="Path to data file")
 parser.add_argument("--output", required=False)
-parser.add_argument("--delimiter", required=False)
-parser.add_argument("--multiline", action="store_true")
+parser.add_argument("--delimiter", required=False, help="Override detected delimiter")
+parser.add_argument("--multiline", action="store_true", help="Override detected json multiline")
 args = parser.parse_args()
+
+detected = detect_file(args.file)
+if not args.type:
+    args.type = detected.get("type")
+print(f"Detected options: {detected}", file=sys.stderr)
 
 spark = SparkSession.builder.master("local[*]") \
          .appName("edsm_bronze_load") \
@@ -30,12 +89,17 @@ spark = SparkSession.builder.master("local[*]") \
 
 reader = spark.read.format(args.type)
 if args.type == "csv":
-    reader = reader.option("header", "true").option("inferSchema", "true")
-    if args.delimiter:
-        reader = reader.option("delimiter", args.delimiter)
-if args.type == "json":
-    if args.multiline:
+    delimiter = args.delimiter if args.delimiter else detected.get("delimiter", ",")
+    header = "true" if detected.get("header", True) else "false"
+    reader = reader.option("header", header).option("inferSchema", "true").option("delimiter", delimiter)
+    if detected.get("encoding"):
+        reader = reader.option("encoding", detected["encoding"])
+elif args.type == "json":
+    multiline = args.multiline or detected.get("multiline", False)
+    if multiline:
         reader = reader.option("multiline", "true")
+    if detected.get("encoding"):
+        reader = reader.option("encoding", detected["encoding"])
 df = reader.load(args.file)
 
 df = df.drop("_corrupt_record")
