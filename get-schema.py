@@ -41,15 +41,25 @@ def detect_csv(path: str) -> dict:
 
 
 def detect_json(path: str) -> dict:
-    """Return json related options using a small sample."""
+    """Return json related options by examining the file contents."""
     encoding = detect_encoding(path)
+    # Read the entire file rather than a small sample so we can
+    # distinguish between a valid JSON document and newline delimited JSON
+    # (NDJSON). NDJSON will fail to load as a single JSON object or array
+    # which allows us to treat it as multiline=False.
     with open(path, "r", encoding=encoding, errors="ignore") as fh:
-        text = fh.read(2048)
+        lines = fh.readlines()
+
+    joined = "".join(lines)
     try:
-        json.loads(text)
-        multiline = False
+        parsed = json.loads(joined)
+        # If the file parses as a JSON object or array then it is a
+        # multiline JSON file. NDJSON files will trigger the exception
+        # path below which sets multiline to False.
+        multiline = isinstance(parsed, (dict, list))
     except json.JSONDecodeError:
-        multiline = True
+        multiline = False
+
     return {"type": "json", "multiline": multiline, "encoding": encoding}
 
 
