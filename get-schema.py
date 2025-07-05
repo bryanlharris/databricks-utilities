@@ -107,24 +107,23 @@ schema_json_str = df.schema.json()
 schema_json = json.loads(schema_json_str)
 
 result = {}
-result["file_type"] = args.type
+result["readStreamOptions"] = {"cloudFiles.format": args.type}
 if args.type == "csv":
-    result["read_options"] = {
+    result["readStreamOptions"].update({
         "delimiter": detected.get("delimiter", ","),
-        "header": bool(detected.get("header", True)),
-    }
+        "header": "true" if detected.get("header", True) else "false",
+    })
     if detected.get("encoding"):
-        result["read_options"]["encoding"] = detected["encoding"]
+        result["readStreamOptions"]["encoding"] = detected["encoding"]
 elif args.type == "json":
-    result["read_options"] = {
-        "multiline": bool(args.multiline or detected.get("multiline", False)),
-    }
+    result["readStreamOptions"].update({
+        "multiline": "true" if args.multiline or detected.get("multiline", False) else "false",
+    })
     if detected.get("encoding"):
-        result["read_options"]["encoding"] = detected["encoding"]
-else:
-    result["read_options"] = {}
+        result["readStreamOptions"]["encoding"] = detected["encoding"]
 
 result["file_schema"] = schema_json
+result["history_schema"] = "history"
 
 if args.output == "stdout":
     print(json.dumps(result, indent=4))
