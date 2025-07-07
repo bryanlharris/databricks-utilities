@@ -25,17 +25,18 @@ def detect_encoding(path: str) -> str:
     return "utf-8"
 
 
-def detect_csv(path: str) -> dict:
+def detect_csv(path: str, delimiter: str | None = None) -> dict:
     """Return csv related options using a small sample."""
     encoding = detect_encoding(path)
     with open(path, "r", encoding=encoding, errors="ignore") as fh:
         sample = fh.read(2048)
     sniffer = csv.Sniffer()
-    try:
-        dialect = sniffer.sniff(sample)
-        delimiter = dialect.delimiter
-    except csv.Error:
-        delimiter = ","
+    if delimiter is None:
+        try:
+            dialect = sniffer.sniff(sample)
+            delimiter = dialect.delimiter
+        except csv.Error:
+            delimiter = ","
     has_header = sniffer.has_header(sample)
     return {"type": "csv", "delimiter": delimiter, "header": has_header, "encoding": encoding}
 
@@ -63,12 +64,12 @@ def detect_json(path: str) -> dict:
     return {"type": "json", "multiline": multiline, "encoding": encoding}
 
 
-def detect_file(path: str) -> dict:
+def detect_file(path: str, delimiter: str | None = None) -> dict:
     suffix = Path(path).suffix.lower()
     if suffix == ".csv":
-        return detect_csv(path)
+        return detect_csv(path, delimiter)
     if suffix == ".txt":
-        return detect_csv(path)
+        return detect_csv(path, delimiter)
     if suffix == ".json":
         return detect_json(path)
     return {"type": suffix.lstrip(".")}
@@ -88,7 +89,7 @@ parser.add_argument("--delimiter", required=False, help="Override detected delim
 parser.add_argument("--multiline", action="store_true", help="Override detected json multiline")
 args = parser.parse_args()
 
-detected = detect_file(args.file)
+detected = detect_file(args.file, delimiter=args.delimiter)
 if not args.type:
     args.type = detected.get("type")
 print(f"Detected options: {detected}", file=sys.stderr)
@@ -130,7 +131,7 @@ result = {}
 result["readStreamOptions"] = {"cloudFiles.format": args.type}
 if args.type == "csv":
     result["readStreamOptions"].update({
-        "delimiter": detected.get("delimiter", ","),
+        "delimiter": args.delimiter if args.delimiter else detected.get("delimiter", ","),
         "header": "true" if detected.get("header", True) else "false",
     })
     if detected.get("encoding"):
