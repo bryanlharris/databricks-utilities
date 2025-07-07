@@ -67,6 +67,8 @@ def detect_file(path: str) -> dict:
     suffix = Path(path).suffix.lower()
     if suffix == ".csv":
         return detect_csv(path)
+    if suffix == ".txt":
+        return detect_csv(path)
     if suffix == ".json":
         return detect_json(path)
     return {"type": suffix.lstrip(".")}
