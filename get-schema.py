@@ -118,6 +118,14 @@ df = df.drop("_corrupt_record")
 schema_json_str = df.schema.json()
 schema_json = json.loads(schema_json_str)
 
+# Always include a placeholder column for storing rescued records
+schema_json.get("fields", []).append({
+    "metadata": {},
+    "name": "_rescued_data",
+    "nullable": True,
+    "type": "string",
+})
+
 result = {}
 result["readStreamOptions"] = {"cloudFiles.format": args.type}
 if args.type == "csv":
