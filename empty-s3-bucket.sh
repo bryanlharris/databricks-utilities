@@ -13,11 +13,20 @@ AWS_CLI=(aws --profile "$PROFILE")
 
 # List all object versions and delete markers once and delete them in bulk.
 
-DELETE_FILE=$(mktemp)
-trap 'rm -f "$DELETE_FILE"' EXIT
+TMP_DIR=$(mktemp -d /tmp/delete.XXXXXX)
+trap 'rm -rf "$TMP_DIR"' EXIT
 
-"${AWS_CLI[@]}" s3api list-object-versions --bucket "$BUCKET" --output json | jq '{Objects: (.Versions + .DeleteMarkers | map({Key: .Key} + (if .VersionId == null or .VersionId == "null" then {} else {VersionId: .VersionId} end)))}' > "$DELETE_FILE"
-
-if [[ $(jq '.Objects | length' "$DELETE_FILE") -gt 0 ]]; then
-    "${AWS_CLI[@]}" s3api delete-objects --bucket "$BUCKET" --delete "file://$DELETE_FILE"
-fi
+"${AWS_CLI[@]}" s3api list-object-versions --bucket "$BUCKET" --output json |
+jq -c '.Versions + .DeleteMarkers
+    | map({Key: .Key} + (if .VersionId == null or .VersionId == "null" then {} else {VersionId: .VersionId} end))
+    | [range(0; length; 999)] as $idxs
+    | $idxs[] as $i
+    | {Objects: .[$i:$i+999]}' |
+while IFS= read -r CHUNK; do
+    CHUNK_FILE=$(mktemp /tmp/delete_chunk.XXXXXX)
+    echo "$CHUNK" > "$CHUNK_FILE"
+    if [[ $(jq '.Objects | length' "$CHUNK_FILE") -gt 0 ]]; then
+        "${AWS_CLI[@]}" s3api delete-objects --bucket "$BUCKET" --delete "file://$CHUNK_FILE"
+    fi
+    rm -f "$CHUNK_FILE"
+done
