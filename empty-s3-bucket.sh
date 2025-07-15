@@ -12,19 +12,10 @@ BUCKET="$2"
 AWS_CLI=(aws --profile "$PROFILE")
 
 # List all object versions and delete markers and remove them permanently.
-# Run up to 10 deletions in parallel so the machine isn't overwhelmed.
-MAX_JOBS=10
-current_jobs=0
 
 while IFS=$'\t' read -r KEY VERSION_ID; do
-    "${AWS_CLI[@]}" s3api delete-object --bucket "$BUCKET" --key "$KEY" --version-id "$VERSION_ID" &
-    ((current_jobs++))
-    if (( current_jobs >= MAX_JOBS )); then
-        wait -n
-        ((current_jobs--))
-    fi
+    "${AWS_CLI[@]}" s3api delete-object --bucket "$BUCKET" --key "$KEY" --version-id "$VERSION_ID"
 done < <(
     "${AWS_CLI[@]}" s3api list-object-versions --bucket "$BUCKET" --output json \
         | jq -r '.Versions[]?, .DeleteMarkers[]? | [.Key, .VersionId] | @tsv'
 )
-wait
