@@ -7,7 +7,6 @@ import json
 import subprocess
 import csv
 from pathlib import Path
-import xml.etree.ElementTree as ET
 from pyspark.sql import SparkSession
 
 
