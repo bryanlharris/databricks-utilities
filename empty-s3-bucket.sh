@@ -16,7 +16,7 @@ AWS_CLI=(aws --profile "$PROFILE")
 DELETE_FILE=$(mktemp)
 trap 'rm -f "$DELETE_FILE"' EXIT
 
-"${AWS_CLI[@]}" s3api list-object-versions --bucket "$BUCKET" --output json | jq '{Objects: (.Versions + .DeleteMarkers | map({Key: .Key, VersionId: .VersionId}))}' > "$DELETE_FILE"
+"${AWS_CLI[@]}" s3api list-object-versions --bucket "$BUCKET" --output json | jq '{Objects: (.Versions + .DeleteMarkers | map({Key: .Key} + (if .VersionId == null or .VersionId == "null" then {} else {VersionId: .VersionId} end)))}' > "$DELETE_FILE"
 
 if [[ $(jq '.Objects | length' "$DELETE_FILE") -gt 0 ]]; then
     "${AWS_CLI[@]}" s3api delete-objects --bucket "$BUCKET" --delete "file://$DELETE_FILE"
