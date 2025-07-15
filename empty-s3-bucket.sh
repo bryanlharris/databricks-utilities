@@ -11,11 +11,15 @@ PROFILE="$1"
 BUCKET="$2"
 AWS_CLI=(aws --profile "$PROFILE")
 
-# List all object versions and delete markers and remove them permanently.
+# List all object versions and delete markers once and delete them in bulk.
 
-while IFS=$'\t' read -r KEY VERSION_ID; do
-    "${AWS_CLI[@]}" s3api delete-object --bucket "$BUCKET" --key "$KEY" --version-id "$VERSION_ID"
-done < <(
-    "${AWS_CLI[@]}" s3api list-object-versions --bucket "$BUCKET" --output json \
-        | jq -r '.Versions[]?, .DeleteMarkers[]? | [.Key, .VersionId] | @tsv'
-)
+DELETE_FILE=$(mktemp)
+trap 'rm -f "$DELETE_FILE"' EXIT
+
+"${AWS_CLI[@]}" s3api list-object-versions --bucket "$BUCKET" --output json \
+    | jq '{Objects: (.Versions + .DeleteMarkers \
+        | map({Key: .Key, VersionId: .VersionId}))}' > "$DELETE_FILE"
+
+if [[ $(jq '.Objects | length' "$DELETE_FILE") -gt 0 ]]; then
+    "${AWS_CLI[@]}" s3api delete-objects --bucket "$BUCKET" --delete "file://$DELETE_FILE"
+fi
