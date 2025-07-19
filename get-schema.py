@@ -27,8 +27,29 @@ def detect_encoding(path: str) -> str:
 def detect_csv(path: str, delimiter: str | None = None) -> dict:
     """Return csv related options using a small sample."""
     encoding = detect_encoding(path)
+    sample_lines: list[str] = []
+    max_lines = 1000
+    # Read up to the first ``max_lines`` lines so that sniffer has enough
+    # information to determine the dialect and header presence. ``readline``
+    # ensures we include complete rows even when the file contains very long
+    # lines.
     with open(path, "r", encoding=encoding, errors="ignore") as fh:
-        sample = fh.read(2048)
+        for _ in range(max_lines):
+            line = fh.readline()
+            if not line:
+                break
+            sample_lines.append(line)
+            # If the first line does not contain a newline we keep reading
+            # until we hit one or exceed a reasonable safety limit (64 KiB).
+            if len(sample_lines) == 1 and "\n" not in line:
+                while "\n" not in line and len(line) < 65536:
+                    more = fh.readline()
+                    if not more:
+                        break
+                    line += more
+                sample_lines[0] = line
+    sample = "".join(sample_lines)
+
     sniffer = csv.Sniffer()
     if delimiter is None:
         try:
@@ -36,8 +57,17 @@ def detect_csv(path: str, delimiter: str | None = None) -> dict:
             delimiter = dialect.delimiter
         except csv.Error:
             delimiter = ","
-    has_header = sniffer.has_header(sample)
-    return {"type": "csv", "delimiter": delimiter, "header": has_header, "encoding": encoding}
+    try:
+        has_header = sniffer.has_header(sample)
+    except csv.Error:
+        # Default to True if we can't determine header presence
+        has_header = True
+    return {
+        "type": "csv",
+        "delimiter": delimiter,
+        "header": has_header,
+        "encoding": encoding,
+    }
 
 
 def detect_json(path: str) -> dict:
